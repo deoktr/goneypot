@@ -54,8 +54,7 @@ func main() {
 }
 
 func handleCon(config *ssh.ServerConfig, nConn net.Conn) {
-	// Before use, a handshake must be performed on the incoming
-	// net.Conn.
+	// Before use, a handshake must be performed on the incoming net.Conn.
 	_, chans, reqs, err := ssh.NewServerConn(nConn, config)
 	if err != nil {
 		log.Printf("failed to handshake: %s", err)
@@ -63,6 +62,10 @@ func handleCon(config *ssh.ServerConfig, nConn net.Conn) {
 	}
 	log.Printf("logged in")
 
+	handleChannels(chans, reqs)
+}
+
+func handleChannels(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -76,45 +79,57 @@ func handleCon(config *ssh.ServerConfig, nConn net.Conn) {
 
 	// Service the incoming Channel channel.
 	for newChannel := range chans {
-		// Channels have a type, depending on the application level
-		// protocol intended. In the case of a shell, the type is
-		// "session" and ServerShell may be used to present a simple
-		// terminal interface.
-		if newChannel.ChannelType() != "session" {
-			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
-			continue
-		}
-		channel, requests, err := newChannel.Accept()
-		if err != nil {
-			log.Fatalf("Could not accept channel: %v", err)
-		}
-
-		// Sessions have out-of-band requests such as "shell",
-		// "pty-req" and "env".  Here we handle only the
-		// "shell" request.
-		wg.Add(1)
-		go func(in <-chan *ssh.Request) {
-			for req := range in {
-				req.Reply(req.Type == "shell", nil)
-			}
-			wg.Done()
-		}(requests)
-
-		term := term.NewTerminal(channel, "> ")
-
-		wg.Add(1)
-		go func() {
-			defer func() {
-				channel.Close()
-				wg.Done()
-			}()
-			for {
-				line, err := term.ReadLine()
-				if err != nil {
-					break
-				}
-				fmt.Println(line)
-			}
-		}()
+		handleChannel(newChannel, &wg)
 	}
+}
+
+func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup) {
+	// Channels have a type, depending on the application level protocol
+	// intended. In the case of a shell, the type is "session" and ServerShell
+	// may be used to present a simple terminal interface.
+	if t := newChannel.ChannelType(); t != "session" {
+		_ = newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
+		return
+	}
+	channel, requests, err := newChannel.Accept()
+	if err != nil {
+		log.Fatalf("Could not accept channel: %v", err)
+	}
+
+	// Sessions have out-of-band requests such as "shell", "pty-req" and "env".
+	wg.Add(1)
+	go func(in <-chan *ssh.Request) {
+		for req := range in {
+			switch req.Type {
+			case "shell":
+				req.Reply(req.Type == "shell", nil)
+			case "env":
+				// Save environment variables for later use
+			case "pty-req":
+				// Set the TTY flag on the Docker client to true later
+			case "window-change":
+				// Use the ContainerResize method on the Docker client later
+			case "exec":
+				// Create a container and run it
+			}
+		}
+		wg.Done()
+	}(requests)
+
+	term := term.NewTerminal(channel, "> ")
+
+	wg.Add(1)
+	go func() {
+		defer func() {
+			channel.Close()
+			wg.Done()
+		}()
+		for {
+			line, err := term.ReadLine()
+			if err != nil {
+				break
+			}
+			fmt.Println(line)
+		}
+	}()
 }
