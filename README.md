@@ -21,7 +21,13 @@ go build .
 Run:
 
 ```bash
-./goneypot --key id_rsa --addr 0.0.0.0 --port 2222
+./goneypot -key id_rsa -addr 0.0.0.0 -port 2222
+```
+
+Test:
+
+```bash
+ssh -p 2222 user@localhost
 ```
 
 ## License

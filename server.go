@@ -23,11 +23,15 @@ var (
 func startHoneypot() {
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			log.Printf("%s login attempt: %q:%q", c.RemoteAddr(), c.User(), string(pass))
-			if c.User() == "user" && string(pass) == "tiger" {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("password rejected for %q", c.User())
+			logRemoteEvent(c.RemoteAddr().String(), fmt.Sprintf("login attempt: %q:%q", c.User(), string(pass)))
+			return nil, nil
+
+			// You can filter for specific username and password, for now
+			// everything is accepted
+			// if c.User() == "user" && string(pass) == "tiger" {
+			// 	return nil, nil
+			// }
+			// return nil, fmt.Errorf("password rejected for %q", c.User())
 		},
 	}
 
