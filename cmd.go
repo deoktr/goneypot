@@ -19,6 +19,8 @@ func init() {
 	flag.StringVar(&Prompt, "prompt", Prompt, "shell prompt")
 	flag.StringVar(&ServerVersion, "serverversion", ServerVersion, "ssh server version")
 	flag.StringVar(&Banner, "banner", Banner, "ssh banner")
+	flag.StringVar(&User, "user", User, "auth username, by default any")
+	flag.StringVar(&Password, "pass", Password, "auth password, by default any")
 
 	flag.BoolFunc("version", "print version", func(s string) error {
 		fmt.Println(VERSION)

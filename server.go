@@ -13,7 +13,7 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
-const VERSION = "1.1.0"
+const VERSION = "1.2.0"
 
 var (
 	Prompt         = "[user@server:~]$ "
@@ -22,20 +22,20 @@ var (
 	PrivateKeyFile = "id_rsa"
 	ServerVersion  = "SSH-2.0-OpenSSH_9.9"
 	Banner         = ""
+	User           = ""
+	Password       = ""
 )
 
 func startHoneypot() {
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			logRemoteEvent(c.RemoteAddr().String(), fmt.Sprintf("login attempt: %q:%q", c.User(), string(pass)))
-			return nil, nil
 
-			// You can filter for specific username and password, for now
-			// everything is accepted
-			// if c.User() == "user" && string(pass) == "tiger" {
-			// 	return nil, nil
-			// }
-			// return nil, fmt.Errorf("password rejected for %q", c.User())
+			if (User != "" && c.User() != User) || (Password != "" && string(pass) != Password) {
+				return nil, fmt.Errorf("password rejected for %q", c.User())
+			}
+
+			return nil, nil
 		},
 	}
 
