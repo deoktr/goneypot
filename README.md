@@ -12,8 +12,16 @@ Generate SSH server private keys without passphrase:
 ssh-keygen -f id_rsa -N "" -t rsa
 ```
 
+Build:
+
 ```bash
-go run .
+go build .
+```
+
+Run:
+
+```bash
+./goneypot --key id_rsa --addr 0.0.0.0 --port 2222
 ```
 
 ## License
