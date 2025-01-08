@@ -6,8 +6,6 @@ import (
 	"os"
 )
 
-const VERSION = "1.0.0"
-
 func ExecuteCLI() {
 	flag.Parse()
 
@@ -15,10 +13,12 @@ func ExecuteCLI() {
 }
 
 func init() {
-	flag.StringVar(&Addr, "addr", "0.0.0.0", "honeypot listen address")
-	flag.StringVar(&Port, "port", "2222", "honeypot listen port")
-	flag.StringVar(&PrivateKeyFile, "key", "id_rsa", "private SSH key file")
-	flag.StringVar(&Prompt, "prompt", "[user@db01:~]$ ", "shell prompt")
+	flag.StringVar(&Addr, "addr", Addr, "honeypot listen address")
+	flag.StringVar(&Port, "port", Port, "honeypot listen port")
+	flag.StringVar(&PrivateKeyFile, "key", PrivateKeyFile, "private SSH key file")
+	flag.StringVar(&Prompt, "prompt", Prompt, "shell prompt")
+	flag.StringVar(&ServerVersion, "serverversion", ServerVersion, "ssh server version")
+	flag.StringVar(&Banner, "banner", Banner, "ssh banner")
 
 	flag.BoolFunc("version", "print version", func(s string) error {
 		fmt.Println(VERSION)

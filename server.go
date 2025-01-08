@@ -13,11 +13,15 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
+const VERSION = "1.1.0"
+
 var (
-	Prompt         = "[user@db01:~]$ "
+	Prompt         = "[user@server:~]$ "
 	Addr           = "0.0.0.0"
 	Port           = "2222"
 	PrivateKeyFile = "id_rsa"
+	ServerVersion  = "SSH-2.0-OpenSSH_9.9"
+	Banner         = ""
 )
 
 func startHoneypot() {
@@ -33,6 +37,14 @@ func startHoneypot() {
 			// }
 			// return nil, fmt.Errorf("password rejected for %q", c.User())
 		},
+	}
+
+	if ServerVersion != "" {
+		config.ServerVersion = ServerVersion
+	}
+
+	if Banner != "" {
+		config.BannerCallback = func(conn ssh.ConnMetadata) string { return Banner + "\n" }
 	}
 
 	privateBytes, err := os.ReadFile(PrivateKeyFile)
