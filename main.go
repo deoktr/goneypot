@@ -13,10 +13,17 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
+const (
+	PROMPT           = "[user@db01:~]$ "
+	ADDR             = "0.0.0.0"
+	PORT             = "2222"
+	PRIVATE_KEY_FILE = "id_rsa"
+)
+
 func main() {
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			log.Printf("login attempt: %s:%s", c.User(), string(pass))
+			log.Printf("%s login attempt: %q:%q", c.RemoteAddr(), c.User(), string(pass))
 			if c.User() == "user" && string(pass) == "tiger" {
 				return nil, nil
 			}
@@ -24,18 +31,18 @@ func main() {
 		},
 	}
 
-	privateBytes, err := os.ReadFile("id_rsa")
+	privateBytes, err := os.ReadFile(PRIVATE_KEY_FILE)
 	if err != nil {
-		log.Fatal("Failed to load private key: ", err)
+		log.Fatal("failed to load private key: ", err)
 	}
 
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		log.Fatal("Failed to parse private key: ", err)
+		log.Fatal("failed to parse private key: ", err)
 	}
 	config.AddHostKey(private)
 
-	addr := "0.0.0.0:2222"
+	addr := ADDR + ":" + PORT
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal("failed to listen for connection: ", err)
@@ -47,25 +54,28 @@ func main() {
 		if err != nil {
 			log.Printf("failed to accept incoming connection: %s", err)
 		}
-		log.Printf("connection opened from: %s", nConn.RemoteAddr())
 
-		go handleCon(config, nConn)
+		remoteAddr := nConn.RemoteAddr().String()
+
+		logRemoteEvent(remoteAddr, "connection opened")
+
+		go handleCon(config, nConn, remoteAddr)
 	}
 }
 
-func handleCon(config *ssh.ServerConfig, nConn net.Conn) {
+func handleCon(config *ssh.ServerConfig, nConn net.Conn, remoteAddr string) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	_, chans, reqs, err := ssh.NewServerConn(nConn, config)
 	if err != nil {
-		log.Printf("failed to handshake: %s", err)
+		logRemoteEvent(remoteAddr, fmt.Sprintf("failed to handshake: %s", err))
 		return
 	}
-	log.Printf("logged in")
+	logRemoteEvent(remoteAddr, "logged in")
 
-	handleChannels(chans, reqs)
+	handleChannels(chans, reqs, remoteAddr)
 }
 
-func handleChannels(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request) {
+func handleChannels(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request, remoteAddr string) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -74,16 +84,16 @@ func handleChannels(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request) {
 	go func() {
 		ssh.DiscardRequests(reqs)
 		wg.Done()
-		log.Println("connection closed")
+		logRemoteEvent(remoteAddr, "connection closed")
 	}()
 
 	// Service the incoming Channel channel.
 	for newChannel := range chans {
-		handleChannel(newChannel, &wg)
+		handleChannel(newChannel, &wg, remoteAddr)
 	}
 }
 
-func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup) {
+func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr string) {
 	// Channels have a type, depending on the application level protocol
 	// intended. In the case of a shell, the type is "session" and ServerShell
 	// may be used to present a simple terminal interface.
@@ -91,32 +101,31 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup) {
 		_ = newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
 		return
 	}
+
 	channel, requests, err := newChannel.Accept()
 	if err != nil {
-		log.Fatalf("Could not accept channel: %v", err)
+		logRemoteEvent(remoteAddr, fmt.Sprintf("could not accept channel: %v", err))
 	}
 
 	// Sessions have out-of-band requests such as "shell", "pty-req" and "env".
 	wg.Add(1)
 	go func(in <-chan *ssh.Request) {
 		for req := range in {
+			logRemoteEvent(remoteAddr, fmt.Sprintf("req %s: %q", req.Type, req.Payload))
+
 			switch req.Type {
 			case "shell":
 				req.Reply(req.Type == "shell", nil)
 			case "env":
-				// Save environment variables for later use
 			case "pty-req":
-				// Set the TTY flag on the Docker client to true later
 			case "window-change":
-				// Use the ContainerResize method on the Docker client later
 			case "exec":
-				// Create a container and run it
 			}
 		}
 		wg.Done()
 	}(requests)
 
-	term := term.NewTerminal(channel, "> ")
+	term := term.NewTerminal(channel, PROMPT)
 
 	wg.Add(1)
 	go func() {
@@ -129,7 +138,18 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup) {
 			if err != nil {
 				break
 			}
-			fmt.Println(line)
+
+			// ignore empty commands
+			if line == "" {
+				continue
+			}
+
+			logRemoteEvent(remoteAddr, fmt.Sprintf("cmd: %q", line))
 		}
 	}()
+}
+
+func logRemoteEvent(remoteAddr string, message string) {
+	// TODO: create one log file for each remoteAddr
+	log.Printf("%s %s", remoteAddr, message)
 }

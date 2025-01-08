@@ -1,6 +1,8 @@
 # goneypot
 
-SSH honeypot written in Go.
+Low-interaction SSH honeypot written in Go.
+
+Attackers will be able to log in, and send commands, but nothing is ever executed, just logged.
 
 ## Usage
 
