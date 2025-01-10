@@ -30,3 +30,6 @@ goneypot
 # SSH key
 id_rsa
 id_rsa.pub
+
+# log files
+*.log

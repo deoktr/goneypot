@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"sync"
 
 	"golang.org/x/crypto/ssh"
@@ -13,14 +14,15 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
-const VERSION = "1.2.0"
+const VERSION = "1.3.0"
 
 var (
-	Prompt         = "[user@server:~]$ "
 	Addr           = "0.0.0.0"
 	Port           = "2222"
 	PrivateKeyFile = "id_rsa"
+	LoggingRoot    = ""
 	ServerVersion  = "SSH-2.0-OpenSSH_9.9"
+	Prompt         = "[user@server:~]$ "
 	Banner         = ""
 	User           = ""
 	Password       = ""
@@ -127,15 +129,15 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 	wg.Add(1)
 	go func(in <-chan *ssh.Request) {
 		for req := range in {
-			logRemoteEvent(remoteAddr, fmt.Sprintf("req %s: %q", req.Type, req.Payload))
-
 			switch req.Type {
 			case "shell":
 				req.Reply(req.Type == "shell", nil)
 			case "env":
+				logRemoteEvent(remoteAddr, fmt.Sprintf("env: %q", req.Payload))
 			case "pty-req":
 			case "window-change":
 			case "exec":
+				logRemoteEvent(remoteAddr, fmt.Sprintf("exec: %q", req.Payload))
 			}
 		}
 		wg.Done()
@@ -149,6 +151,17 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 			channel.Close()
 			wg.Done()
 		}()
+
+		logFileName := path.Join(LoggingRoot, remoteAddr+".log")
+		fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.Printf("failed to open log file: %s", err)
+			return
+		}
+		defer func() {
+			fo.Close()
+		}()
+
 		for {
 			line, err := term.ReadLine()
 			if err != nil {
@@ -160,12 +173,11 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 				continue
 			}
 
-			logRemoteEvent(remoteAddr, fmt.Sprintf("cmd: %q", line))
+			fo.WriteString(line + "\n")
 		}
 	}()
 }
 
 func logRemoteEvent(remoteAddr string, message string) {
-	// TODO: create one log file for each remoteAddr
 	log.Printf("%s %s", remoteAddr, message)
 }

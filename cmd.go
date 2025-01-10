@@ -16,6 +16,7 @@ func init() {
 	flag.StringVar(&Addr, "addr", Addr, "honeypot listen address")
 	flag.StringVar(&Port, "port", Port, "honeypot listen port")
 	flag.StringVar(&PrivateKeyFile, "key", PrivateKeyFile, "private SSH key file")
+	flag.StringVar(&LoggingRoot, "logroot", LoggingRoot, "logging root directory (default current)")
 	flag.StringVar(&Prompt, "prompt", Prompt, "shell prompt")
 	flag.StringVar(&ServerVersion, "serverversion", ServerVersion, "ssh server version")
 	flag.StringVar(&Banner, "banner", Banner, "ssh banner")

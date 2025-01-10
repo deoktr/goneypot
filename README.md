@@ -30,6 +30,11 @@ Test:
 ssh -p 2222 user@localhost
 ```
 
+## Alternatives
+
+- [cowrie](https://github.com/cowrie/cowrie)
+- [sshesame](https://github.com/jaksi/sshesame)
+
 ## License
 
 goneypot is licensed under [MIT](./LICENSE).
