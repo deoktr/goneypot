@@ -14,7 +14,7 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
-const VERSION = "1.3.0"
+const VERSION = "1.4.0"
 
 var (
 	Addr           = "0.0.0.0"
@@ -26,6 +26,9 @@ var (
 	Banner         = ""
 	User           = ""
 	Password       = ""
+
+	// remote event logger to stdout
+	remoteLogger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
 )
 
 func startHoneypot() {
@@ -137,7 +140,23 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 			case "pty-req":
 			case "window-change":
 			case "exec":
-				logRemoteEvent(remoteAddr, fmt.Sprintf("exec: %q", req.Payload))
+				// log exec to files like regular commands
+				logFileName := path.Join(LoggingRoot, remoteAddr+".log")
+				fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+				if err != nil {
+					log.Printf("failed to open log file: %s", err)
+					return
+				}
+				defer func() {
+					fo.Close()
+				}()
+
+				_, err = fo.Write(req.Payload)
+				if err != nil {
+					log.Printf("failed to write exec payload to log file: %s", err)
+					return
+				}
+				fo.Close()
 			}
 		}
 		wg.Done()
@@ -173,11 +192,15 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 				continue
 			}
 
-			fo.WriteString(line + "\n")
+			_, err = fo.WriteString(line + "\n")
+			if err != nil {
+				log.Printf("failed to write command to log file: %s", err)
+				return
+			}
 		}
 	}()
 }
 
 func logRemoteEvent(remoteAddr string, message string) {
-	log.Printf("%s %s", remoteAddr, message)
+	remoteLogger.Printf("%s %s", remoteAddr, message)
 }
