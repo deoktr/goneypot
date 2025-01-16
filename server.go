@@ -14,7 +14,7 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
-const VERSION = "1.4.0"
+const VERSION = "1.4.1"
 
 var (
 	Addr           = "0.0.0.0"
@@ -22,7 +22,7 @@ var (
 	PrivateKeyFile = "id_rsa"
 	LoggingRoot    = ""
 	ServerVersion  = "SSH-2.0-OpenSSH_9.9"
-	Prompt         = "[user@server:~]$ "
+	Prompt         = "user@server:~$ "
 	Banner         = ""
 	User           = ""
 	Password       = ""
@@ -120,12 +120,15 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 	// may be used to present a simple terminal interface.
 	if t := newChannel.ChannelType(); t != "session" {
 		_ = newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
+
+		logRemoteEvent(remoteAddr, fmt.Sprintf("unknown channel type: %s", t))
 		return
 	}
 
 	channel, requests, err := newChannel.Accept()
 	if err != nil {
 		logRemoteEvent(remoteAddr, fmt.Sprintf("could not accept channel: %v", err))
+		return
 	}
 
 	// Sessions have out-of-band requests such as "shell", "pty-req" and "env".
@@ -134,7 +137,11 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 		for req := range in {
 			switch req.Type {
 			case "shell":
-				req.Reply(req.Type == "shell", nil)
+				err := req.Reply(req.Type == "shell", nil)
+				if err != nil {
+					log.Printf("failed to reply to shell request: %s", err)
+					return
+				}
 			case "env":
 				logRemoteEvent(remoteAddr, fmt.Sprintf("env: %q", req.Payload))
 			case "pty-req":
@@ -167,7 +174,9 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 	wg.Add(1)
 	go func() {
 		defer func() {
-			channel.Close()
+			if channel != nil {
+				channel.Close()
+			}
 			wg.Done()
 		}()
 
