@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"sync"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
@@ -14,7 +13,7 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
-const VERSION = "1.5.0"
+const VERSION = "1.6.0"
 
 var (
 	Addr           = "0.0.0.0"
@@ -113,24 +112,19 @@ func handleCon(config *ssh.ServerConfig, nConn net.Conn, remoteAddr string) {
 }
 
 func handleChannels(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request, remoteAddr string) {
-	var wg sync.WaitGroup
-	defer wg.Wait()
-
 	// The incoming Request channel must be serviced.
-	wg.Add(1)
 	go func() {
 		ssh.DiscardRequests(reqs)
-		wg.Done()
 		logRemoteEvent(remoteAddr, "connection closed")
 	}()
 
 	// Service the incoming Channel channel.
 	for newChannel := range chans {
-		handleChannel(newChannel, &wg, remoteAddr)
+		handleChannel(newChannel, remoteAddr)
 	}
 }
 
-func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr string) {
+func handleChannel(newChannel ssh.NewChannel, remoteAddr string) {
 	// Channels have a type, depending on the application level protocol
 	// intended. In the case of a shell, the type is "session" and ServerShell
 	// may be used to present a simple terminal interface.
@@ -147,91 +141,89 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 		return
 	}
 
+	defer func() {
+		if channel != nil {
+			channel.Close()
+		}
+	}()
+
 	// Sessions have out-of-band requests such as "shell", "pty-req" and "env".
-	wg.Add(1)
-	go func(in <-chan *ssh.Request) {
-		for req := range in {
-			switch req.Type {
-			case "shell":
-				err := req.Reply(req.Type == "shell", nil)
-				if err != nil {
-					log.Printf("failed to reply to shell request: %s", err)
-					return
-				}
-			case "env":
-				logRemoteEvent(remoteAddr, fmt.Sprintf("env: %q", req.Payload))
-			case "pty-req":
-			case "window-change":
-			case "exec":
-				totalCommands.Add(1)
+	for req := range requests {
+		logRemoteEvent(remoteAddr, fmt.Sprintf("req: %s", req.Type))
 
-				// log exec to files like regular commands
-				logFileName := path.Join(LoggingRoot, remoteAddr+".log")
-				fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-				if err != nil {
-					log.Printf("failed to open log file: %s", err)
-					totalErrors.Add(1)
-					return
-				}
-				defer func() {
-					fo.Close()
-				}()
-
-				_, err = fo.Write(req.Payload)
-				if err != nil {
-					log.Printf("failed to write exec payload to log file: %s", err)
-					totalErrors.Add(1)
-					return
-				}
-				fo.Close()
-			}
-		}
-		wg.Done()
-	}(requests)
-
-	term := term.NewTerminal(channel, Prompt)
-
-	wg.Add(1)
-	go func() {
-		defer func() {
-			if channel != nil {
-				channel.Close()
-			}
-			wg.Done()
-		}()
-
-		logFileName := path.Join(LoggingRoot, remoteAddr+".log")
-		fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-		if err != nil {
-			log.Printf("failed to open log file: %s", err)
-			totalErrors.Add(1)
-			return
-		}
-		defer func() {
-			fo.Close()
-		}()
-
-		for {
-			line, err := term.ReadLine()
+		switch req.Type {
+		case "shell":
+			err := req.Reply(req.Type == "shell", nil)
 			if err != nil {
-				break
+				log.Printf("failed to reply to shell request: %s", err)
+				return
 			}
 
-			// ignore empty commands
-			if line == "" {
-				continue
-			}
-
+			handleShell(channel, remoteAddr)
+			return
+		case "env":
+			logRemoteEvent(remoteAddr, fmt.Sprintf("env: %q", req.Payload))
+		case "pty-req":
+		case "window-change":
+		case "exec":
 			totalCommands.Add(1)
 
-			_, err = fo.WriteString(line + "\n")
+			logFileName := path.Join(LoggingRoot, remoteAddr+".log")
+			fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 			if err != nil {
-				log.Printf("failed to write command to log file: %s", err)
+				log.Printf("failed to open log file: %s", err)
 				totalErrors.Add(1)
 				return
 			}
+			defer func() {
+				fo.Close()
+			}()
+
+			_, err = fo.Write(req.Payload)
+			if err != nil {
+				log.Printf("failed to write exec payload to log file: %s", err)
+				totalErrors.Add(1)
+				return
+			}
+			return
 		}
+	}
+}
+
+func handleShell(channel ssh.Channel, remoteAddr string) {
+	term := term.NewTerminal(channel, Prompt)
+
+	logFileName := path.Join(LoggingRoot, remoteAddr+".log")
+	fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	if err != nil {
+		log.Printf("failed to open log file: %s", err)
+		totalErrors.Add(1)
+		return
+	}
+	defer func() {
+		fo.Close()
 	}()
+
+	for {
+		line, err := term.ReadLine()
+		if err != nil {
+			break
+		}
+
+		// ignore empty commands
+		if line == "" {
+			continue
+		}
+
+		totalCommands.Add(1)
+
+		_, err = fo.WriteString(line + "\n")
+		if err != nil {
+			log.Printf("failed to write command to log file: %s", err)
+			totalErrors.Add(1)
+			return
+		}
+	}
 }
 
 func logRemoteEvent(remoteAddr string, message string) {
