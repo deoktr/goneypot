@@ -14,7 +14,7 @@ import (
 
 // TODO: add timeouts, to prevent hanging connections
 
-const VERSION = "1.4.1"
+const VERSION = "1.5.0"
 
 var (
 	Addr           = "0.0.0.0"
@@ -26,6 +26,7 @@ var (
 	Banner         = ""
 	User           = ""
 	Password       = ""
+	DisableLogin   = false
 
 	// remote event logger to stdout
 	remoteLogger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
@@ -35,6 +36,12 @@ func startHoneypot() {
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			logRemoteEvent(c.RemoteAddr().String(), fmt.Sprintf("login attempt: %q:%q", c.User(), string(pass)))
+
+			loginAtempts.Add(1)
+
+			if DisableLogin {
+				return nil, fmt.Errorf("password rejected for %q", c.User())
+			}
 
 			if (User != "" && c.User() != User) || (Password != "" && string(pass) != Password) {
 				return nil, fmt.Errorf("password rejected for %q", c.User())
@@ -68,19 +75,27 @@ func startHoneypot() {
 	if err != nil {
 		log.Fatal("failed to listen for connection: ", err)
 	}
+
 	log.Printf("listening on: %s", addr)
 
 	for {
 		nConn, err := listener.Accept()
 		if err != nil {
 			log.Printf("failed to accept incoming connection: %s", err)
+			totalErrors.Add(1)
+			continue
 		}
 
 		remoteAddr := nConn.RemoteAddr().String()
 
 		logRemoteEvent(remoteAddr, "connection opened")
 
-		go handleCon(config, nConn, remoteAddr)
+		openedConnections.Add(1)
+		totalConnections.Add(1)
+		go func() {
+			handleCon(config, nConn, remoteAddr)
+			openedConnections.Sub(1)
+		}()
 	}
 }
 
@@ -91,6 +106,7 @@ func handleCon(config *ssh.ServerConfig, nConn net.Conn, remoteAddr string) {
 		logRemoteEvent(remoteAddr, fmt.Sprintf("failed to handshake: %s", err))
 		return
 	}
+
 	logRemoteEvent(remoteAddr, "logged in")
 
 	handleChannels(chans, reqs, remoteAddr)
@@ -147,11 +163,14 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 			case "pty-req":
 			case "window-change":
 			case "exec":
+				totalCommands.Add(1)
+
 				// log exec to files like regular commands
 				logFileName := path.Join(LoggingRoot, remoteAddr+".log")
 				fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 				if err != nil {
 					log.Printf("failed to open log file: %s", err)
+					totalErrors.Add(1)
 					return
 				}
 				defer func() {
@@ -161,6 +180,7 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 				_, err = fo.Write(req.Payload)
 				if err != nil {
 					log.Printf("failed to write exec payload to log file: %s", err)
+					totalErrors.Add(1)
 					return
 				}
 				fo.Close()
@@ -184,6 +204,7 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 		fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 		if err != nil {
 			log.Printf("failed to open log file: %s", err)
+			totalErrors.Add(1)
 			return
 		}
 		defer func() {
@@ -201,9 +222,12 @@ func handleChannel(newChannel ssh.NewChannel, wg *sync.WaitGroup, remoteAddr str
 				continue
 			}
 
+			totalCommands.Add(1)
+
 			_, err = fo.WriteString(line + "\n")
 			if err != nil {
 				log.Printf("failed to write command to log file: %s", err)
+				totalErrors.Add(1)
 				return
 			}
 		}

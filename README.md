@@ -30,6 +30,14 @@ Test:
 ssh -p 2222 user@localhost
 ```
 
+### Prometheus
+
+goneypot supports [Prometheus](https://prometheus.io/), to enable it use flag `-enable-prometheus`:
+
+```bash
+goneypot -enable-prometheus -prom-port 9001 -prom-addr localhost
+```
+
 ## Alternatives
 
 - [cowrie](https://github.com/cowrie/cowrie)
