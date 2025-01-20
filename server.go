@@ -1,52 +1,106 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"path"
+	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
 
-// TODO: add timeouts, to prevent hanging connections
-
-const VERSION = "1.6.0"
+const VERSION = "1.7.0"
 
 var (
 	Addr           = "0.0.0.0"
-	Port           = "2222"
+	Port           = 2222
 	PrivateKeyFile = "id_rsa"
 	LoggingRoot    = ""
 	ServerVersion  = "SSH-2.0-OpenSSH_9.9"
 	Prompt         = "user@server:~$ "
 	Banner         = ""
-	User           = ""
-	Password       = ""
+	CredsFile      = ""
+	Credentials    = map[string]string{}
 	DisableLogin   = false
 
-	// remote event logger to stdout
+	// remote events logger to stdout
 	remoteLogger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
+
+	// credentials logger
+	DisableCredsLog = false
+	CredsLoggerFile = "credentials.log"
+	credsLogger     *log.Logger
 )
+
+func logRemoteEvent(remoteAddr string, message string) {
+	remoteLogger.Printf("%s %s", remoteAddr, message)
+}
+
+func loadCredentials(loginFile string) error {
+	f, err := os.Open(loginFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		sline := strings.SplitN(scanner.Text(), ":", 2)
+		Credentials[sline[0]] = sline[1]
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func passwordCallback(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+	if DisableLogin {
+		return nil, fmt.Errorf("login disabled")
+	}
+
+	// if there is no credentials then everyone can log in
+	if len(Credentials) == 0 {
+		return nil, nil
+	}
+
+	password, found := Credentials[c.User()]
+
+	if !found {
+		return nil, fmt.Errorf("user not found %q", c.User())
+	}
+
+	if password != string(pass) {
+		return nil, fmt.Errorf("wrong password for %q", c.User())
+	}
+
+	return nil, nil
+}
 
 func startHoneypot() {
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			logRemoteEvent(c.RemoteAddr().String(), fmt.Sprintf("login attempt: %q:%q", c.User(), string(pass)))
+			if !DisableCredsLog {
+				logRemoteEvent(c.RemoteAddr().String(), fmt.Sprintf("login attempt: %q:%q", c.User(), string(pass)))
+				credsLogger.Printf("%s:%s", c.User(), string(pass))
+			} else {
+				logRemoteEvent(c.RemoteAddr().String(), "login attempt")
+			}
 
 			loginAtempts.Add(1)
-
-			if DisableLogin {
-				return nil, fmt.Errorf("password rejected for %q", c.User())
+			sshPerm, err := passwordCallback(c, pass)
+			if err != nil {
+				loginFailed.Add(1)
 			}
 
-			if (User != "" && c.User() != User) || (Password != "" && string(pass) != Password) {
-				return nil, fmt.Errorf("password rejected for %q", c.User())
-			}
-
-			return nil, nil
+			return sshPerm, err
 		},
 	}
 
@@ -69,7 +123,26 @@ func startHoneypot() {
 	}
 	config.AddHostKey(private)
 
-	addr := Addr + ":" + Port
+	if CredsFile != "" {
+		err = loadCredentials(CredsFile)
+		if err != nil {
+			log.Fatal("failed to load login credentials: ", err)
+		}
+		log.Printf("loaded credentials from: %s", CredsFile)
+	}
+
+	// init creds logger
+	if !DisableCredsLog {
+		p := path.Join(LoggingRoot, CredsLoggerFile)
+		f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatal("error opening file: ", err)
+		}
+		credsLogger = log.New(f, "", 0)
+		log.Printf("set up credential logging to: %s", p)
+	}
+
+	addr := fmt.Sprintf("%s:%d", Addr, Port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal("failed to listen for connection: ", err)
@@ -85,14 +158,19 @@ func startHoneypot() {
 			continue
 		}
 
-		remoteAddr := nConn.RemoteAddr().String()
-
-		logRemoteEvent(remoteAddr, "connection opened")
-
-		openedConnections.Add(1)
-		totalConnections.Add(1)
 		go func() {
+			totalConnections.Add(1)
+			openedConnections.Add(1)
+
+			remoteAddr := nConn.RemoteAddr().String()
+			logRemoteEvent(remoteAddr, "connection opened")
+
+			now := time.Now()
+
 			handleCon(config, nConn, remoteAddr)
+
+			requestDurations.Observe(time.Since(now).Seconds())
+
 			openedConnections.Sub(1)
 		}()
 	}
@@ -224,8 +302,4 @@ func handleShell(channel ssh.Channel, remoteAddr string) {
 			return
 		}
 	}
-}
-
-func logRemoteEvent(remoteAddr string, message string) {
-	remoteLogger.Printf("%s %s", remoteAddr, message)
 }

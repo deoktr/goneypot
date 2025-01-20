@@ -30,6 +30,24 @@ Test:
 ssh -p 2222 user@localhost
 ```
 
+### Credentials
+
+By default, goneypot accept any combinaison of username/password.
+
+Login credentials can be added to restrict the username/password that can log in:
+
+1. create a file with `username:password` in it:
+
+   ```bash
+   echo "foo:foo" > creds
+   ```
+
+2. start goneypot with the `-creds-file` flag:
+
+   ```bash
+   goneypot -creds-file creds
+   ```
+
 ### Prometheus
 
 goneypot supports [Prometheus](https://prometheus.io/), to enable it use flag `-enable-prometheus`:
@@ -42,6 +60,10 @@ goneypot -enable-prometheus -prom-port 9001 -prom-addr localhost
 
 - [cowrie](https://github.com/cowrie/cowrie)
 - [sshesame](https://github.com/jaksi/sshesame)
+
+## TODO
+
+- add connections timeout
 
 ## License
 
