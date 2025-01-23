@@ -14,7 +14,7 @@ import (
 	"golang.org/x/term"
 )
 
-const VERSION = "1.7.0"
+const VERSION = "1.7.1"
 
 var (
 	Addr           = "0.0.0.0"
@@ -25,7 +25,7 @@ var (
 	Prompt         = "user@server:~$ "
 	Banner         = ""
 	CredsFile      = ""
-	Credentials    = map[string]string{}
+	credentials    = map[string]string{}
 	DisableLogin   = false
 
 	// remote events logger to stdout
@@ -41,8 +41,8 @@ func logRemoteEvent(remoteAddr string, message string) {
 	remoteLogger.Printf("%s %s", remoteAddr, message)
 }
 
-func loadCredentials(loginFile string) error {
-	f, err := os.Open(loginFile)
+func loadCredentials(credsFile string) error {
+	f, err := os.Open(credsFile)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,15 @@ func loadCredentials(loginFile string) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		sline := strings.SplitN(scanner.Text(), ":", 2)
-		Credentials[sline[0]] = sline[1]
+		username := sline[0]
+		password := sline[1]
+
+		if _, found := credentials[username]; found {
+			log.Printf("found duplicate credentials for: %s", username)
+			continue
+		}
+
+		credentials[username] = password
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -67,11 +75,11 @@ func passwordCallback(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error)
 	}
 
 	// if there is no credentials then everyone can log in
-	if len(Credentials) == 0 {
+	if len(credentials) == 0 {
 		return nil, nil
 	}
 
-	password, found := Credentials[c.User()]
+	password, found := credentials[c.User()]
 
 	if !found {
 		return nil, fmt.Errorf("user not found %q", c.User())
