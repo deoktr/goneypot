@@ -64,6 +64,7 @@ goneypot -enable-prometheus -prom-port 9001 -prom-addr localhost
 ## TODO
 
 - add connections timeout
+- add receive limits
 
 ## License
 

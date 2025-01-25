@@ -14,7 +14,7 @@ import (
 	"golang.org/x/term"
 )
 
-const VERSION = "1.7.1"
+const VERSION = "1.7.2"
 
 var (
 	Addr           = "0.0.0.0"
@@ -51,6 +51,11 @@ func loadCredentials(credsFile string) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		sline := strings.SplitN(scanner.Text(), ":", 2)
+
+		if len(sline) != 2 {
+			continue
+		}
+
 		username := sline[0]
 		password := sline[1]
 
