@@ -3,8 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 	"runtime"
+	"strconv"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -61,6 +65,39 @@ var (
 	})
 )
 
+func getPrometheusListener() net.Listener {
+	var listener net.Listener = nil
+	var err error
+	if os.Getenv("LISTEN_PID") == strconv.Itoa(os.Getpid()) {
+		// systemd file listener for systemd.socket
+		if os.Getenv("LISTEN_FDS") != "2" {
+			logger.Fatal("LISTEN_FDS should be 2, service expected 2 sockets")
+		}
+		names := strings.Split(os.Getenv("LISTEN_FDNAMES"), ":")
+		for i, name := range names {
+			if name == "prometheus" {
+				f := os.NewFile(uintptr(i+3), "prometheus port")
+				listener, err = net.FileListener(f)
+				if err != nil {
+					logger.Fatal(err)
+				}
+				logger.Printf("prometheus listening on systemd socket")
+				return listener
+			}
+		}
+		logger.Fatal("no socket listener found for goneypot")
+	} else {
+		// port bind
+		addr := fmt.Sprintf("%s:%d", PrometheusAddr, PrometheusPort)
+		listener, err = net.Listen("tcp", addr)
+		if err != nil {
+			logger.Fatal(err)
+		}
+		logger.Printf("prometheus listening on: %s", addr)
+	}
+	return listener
+}
+
 func startPrometheusListener() {
 	buildInfo.With(prometheus.Labels{
 		"version":   VERSION,
@@ -87,11 +124,9 @@ func startPrometheusListener() {
 
 	http.Handle("/metrics", promhttp.Handler())
 
-	addr := fmt.Sprintf("%s:%d", PrometheusAddr, PrometheusPort)
+	listener := getPrometheusListener()
 
-	logger.Printf("starting prometheus metrics on: %s", addr)
-
-	err := http.ListenAndServe(addr, nil)
+	err := http.Serve(listener, nil)
 	if errors.Is(err, http.ErrServerClosed) {
 		logger.Print("metrics server closed")
 	} else if err != nil {

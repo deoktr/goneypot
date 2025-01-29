@@ -14,7 +14,7 @@ import (
 	"golang.org/x/term"
 )
 
-const VERSION = "1.8.0"
+const VERSION = "1.9.0"
 
 var (
 	// goneypot configuration
@@ -86,6 +86,39 @@ func passwordCallback(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error)
 	return nil, nil
 }
 
+func getGoneypotListener() net.Listener {
+	var listener net.Listener = nil
+	var err error
+	if os.Getenv("LISTEN_PID") == strconv.Itoa(os.Getpid()) {
+		// systemd file listener for systemd.socket
+		if os.Getenv("LISTEN_FDS") != "2" {
+			logger.Fatal("LISTEN_FDS should be 2, service expected 2 sockets")
+		}
+		names := strings.Split(os.Getenv("LISTEN_FDNAMES"), ":")
+		for i, name := range names {
+			if name == "goneypot" {
+				f := os.NewFile(uintptr(i+3), "goneypot port")
+				listener, err = net.FileListener(f)
+				if err != nil {
+					logger.Fatal(err)
+				}
+				logger.Printf("goneypot listening on systemd socket")
+				return listener
+			}
+		}
+		logger.Fatal("no socket listener found for goneypot")
+	} else {
+		// port bind
+		addr := fmt.Sprintf("%s:%d", Addr, Port)
+		listener, err = net.Listen("tcp", addr)
+		if err != nil {
+			logger.Fatal(err)
+		}
+		logger.Printf("goneypot listening on: %s", addr)
+	}
+	return listener
+}
+
 func startHoneypot() {
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
@@ -133,24 +166,7 @@ func startHoneypot() {
 		logger.Printf("loaded credentials from: %s", CredsFile)
 	}
 
-	var listener net.Listener = nil
-	if os.Getenv("LISTEN_PID") == strconv.Itoa(os.Getpid()) {
-		// systemd file listener for systemd.socket
-		f := os.NewFile(3, "from systemd")
-		listener, err = net.FileListener(f)
-		if err != nil {
-			logger.Fatal(err)
-		}
-		logger.Printf("listening on systemd socket")
-	} else {
-		// port bind
-		addr := fmt.Sprintf("%s:%d", Addr, Port)
-		listener, err = net.Listen("tcp", addr)
-		if err != nil {
-			logger.Fatal("failed to listen for connection: ", err)
-		}
-		logger.Printf("listening on: %s", addr)
-	}
+	listener := getGoneypotListener()
 
 	for {
 		nConn, err := listener.Accept()
