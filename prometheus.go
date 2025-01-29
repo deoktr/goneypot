@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"runtime"
 
@@ -90,12 +89,12 @@ func startPrometheusListener() {
 
 	addr := fmt.Sprintf("%s:%d", PrometheusAddr, PrometheusPort)
 
-	log.Printf("starting prometheus metrics on: %s", addr)
+	logger.Printf("starting prometheus metrics on: %s", addr)
 
 	err := http.ListenAndServe(addr, nil)
 	if errors.Is(err, http.ErrServerClosed) {
-		log.Print("metrics server closed")
+		logger.Print("metrics server closed")
 	} else if err != nil {
-		log.Printf("error starting metrics server: %s", err)
+		logger.Printf("error starting metrics server: %s", err)
 	}
 }

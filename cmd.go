@@ -9,12 +9,15 @@ import (
 func ExecuteCLI() {
 	flag.Parse()
 
+	setupLoggers()
+
 	startHoneypot()
 }
 
 func init() {
 	// logging
 	flag.StringVar(&LoggingRoot, "logroot", LoggingRoot, "logging root directory (default current)")
+	flag.StringVar(&RemoteLoggerFile, "log-file", RemoteLoggerFile, "events log file")
 	flag.StringVar(&CredsLoggerFile, "creds-log-file", CredsLoggerFile, "login attemp credentials log file")
 	flag.BoolVar(&DisableCredsLog, "disable-creds-log", DisableCredsLog, "disable credentials logging")
 

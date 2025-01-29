@@ -3,10 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,9 +14,10 @@ import (
 	"golang.org/x/term"
 )
 
-const VERSION = "1.7.2"
+const VERSION = "1.8.0"
 
 var (
+	// goneypot configuration
 	Addr           = "0.0.0.0"
 	Port           = 2222
 	PrivateKeyFile = "id_rsa"
@@ -27,19 +28,7 @@ var (
 	CredsFile      = ""
 	credentials    = map[string]string{}
 	DisableLogin   = false
-
-	// remote events logger to stdout
-	remoteLogger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
-
-	// credentials logger
-	DisableCredsLog = false
-	CredsLoggerFile = "credentials.log"
-	credsLogger     *log.Logger
 )
-
-func logRemoteEvent(remoteAddr string, message string) {
-	remoteLogger.Printf("%s %s", remoteAddr, message)
-}
 
 func loadCredentials(credsFile string) error {
 	f, err := os.Open(credsFile)
@@ -60,7 +49,7 @@ func loadCredentials(credsFile string) error {
 		password := sline[1]
 
 		if _, found := credentials[username]; found {
-			log.Printf("found duplicate credentials for: %s", username)
+			logger.Printf("found duplicate credentials for: %s", username)
 			continue
 		}
 
@@ -127,46 +116,46 @@ func startHoneypot() {
 
 	privateBytes, err := os.ReadFile(PrivateKeyFile)
 	if err != nil {
-		log.Fatal("failed to load private key: ", err)
+		logger.Fatal("failed to load private key: ", err)
 	}
 
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		log.Fatal("failed to parse private key: ", err)
+		logger.Fatal("failed to parse private key: ", err)
 	}
 	config.AddHostKey(private)
 
 	if CredsFile != "" {
 		err = loadCredentials(CredsFile)
 		if err != nil {
-			log.Fatal("failed to load login credentials: ", err)
+			logger.Fatal("failed to load login credentials: ", err)
 		}
-		log.Printf("loaded credentials from: %s", CredsFile)
+		logger.Printf("loaded credentials from: %s", CredsFile)
 	}
 
-	// init creds logger
-	if !DisableCredsLog {
-		p := path.Join(LoggingRoot, CredsLoggerFile)
-		f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	var listener net.Listener = nil
+	if os.Getenv("LISTEN_PID") == strconv.Itoa(os.Getpid()) {
+		// systemd file listener for systemd.socket
+		f := os.NewFile(3, "from systemd")
+		listener, err = net.FileListener(f)
 		if err != nil {
-			log.Fatal("error opening file: ", err)
+			logger.Fatal(err)
 		}
-		credsLogger = log.New(f, "", 0)
-		log.Printf("set up credential logging to: %s", p)
+		logger.Printf("listening on systemd socket")
+	} else {
+		// port bind
+		addr := fmt.Sprintf("%s:%d", Addr, Port)
+		listener, err = net.Listen("tcp", addr)
+		if err != nil {
+			logger.Fatal("failed to listen for connection: ", err)
+		}
+		logger.Printf("listening on: %s", addr)
 	}
-
-	addr := fmt.Sprintf("%s:%d", Addr, Port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatal("failed to listen for connection: ", err)
-	}
-
-	log.Printf("listening on: %s", addr)
 
 	for {
 		nConn, err := listener.Accept()
 		if err != nil {
-			log.Printf("failed to accept incoming connection: %s", err)
+			logger.Printf("failed to accept incoming connection: %s", err)
 			totalErrors.Add(1)
 			continue
 		}
@@ -246,7 +235,7 @@ func handleChannel(newChannel ssh.NewChannel, remoteAddr string) {
 		case "shell":
 			err := req.Reply(req.Type == "shell", nil)
 			if err != nil {
-				log.Printf("failed to reply to shell request: %s", err)
+				logger.Printf("failed to reply to shell request: %s", err)
 				return
 			}
 
@@ -262,7 +251,7 @@ func handleChannel(newChannel ssh.NewChannel, remoteAddr string) {
 			logFileName := path.Join(LoggingRoot, remoteAddr+".log")
 			fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 			if err != nil {
-				log.Printf("failed to open log file: %s", err)
+				logger.Printf("failed to open log file: %s", err)
 				totalErrors.Add(1)
 				return
 			}
@@ -272,7 +261,7 @@ func handleChannel(newChannel ssh.NewChannel, remoteAddr string) {
 
 			_, err = fo.Write(req.Payload)
 			if err != nil {
-				log.Printf("failed to write exec payload to log file: %s", err)
+				logger.Printf("failed to write exec payload to log file: %s", err)
 				totalErrors.Add(1)
 				return
 			}
@@ -287,7 +276,7 @@ func handleShell(channel ssh.Channel, remoteAddr string) {
 	logFileName := path.Join(LoggingRoot, remoteAddr+".log")
 	fo, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
-		log.Printf("failed to open log file: %s", err)
+		logger.Printf("failed to open log file: %s", err)
 		totalErrors.Add(1)
 		return
 	}
@@ -310,7 +299,7 @@ func handleShell(channel ssh.Channel, remoteAddr string) {
 
 		_, err = fo.WriteString(line + "\n")
 		if err != nil {
-			log.Printf("failed to write command to log file: %s", err)
+			logger.Printf("failed to write command to log file: %s", err)
 			totalErrors.Add(1)
 			return
 		}
