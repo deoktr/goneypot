@@ -1,0 +1,48 @@
+[Unit]
+After=network.target
+Description=goneypot v1.9.1
+Requires=goneypot.socket goneypot-prometheus.socket
+
+[Service]
+AppArmorProfile=goneypot
+CapabilityBoundingSet=
+ExecStart=/usr/bin/goneypot -logroot '/var/log/goneypot' -log-file 'goneypot.log' -port 22 -addr 0.0.0.0 -key /etc/goneypot/id_rsa -prompt 'user@server:~$ ' -server-version 'SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.5' -banner ''  -creds-file '/etc/goneypot/credentials.lst' -creds-log-file 'credentials.log' -prom-port 9001 -prom-addr 'localhost' -enable-prometheus
+ExecStartPre=+/usr/bin/goneypotpre
+Group=goneypot
+IPAddressDeny=any
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+NonBlocking=true
+PrivateDevices=true
+PrivateMounts=true
+PrivateNetwork=true
+PrivateTmp=true
+PrivateUsers=true
+ProcSubset=pid
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ReadOnlyPaths=-/etc/goneypot
+ReadWritePaths=-/var/log/goneypot
+RemoveIPC=true
+Restart=on-failure
+RestrictAddressFamilies=none
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SecureBits=noroot-locked
+SystemCallArchitectures=native
+SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @privileged @raw-io @reboot @swap
+Type=simple
+UMask=0077
+User=goneypot
+
+[Install]
+WantedBy=multi-user.target

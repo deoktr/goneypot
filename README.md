@@ -56,6 +56,30 @@ goneypot supports [Prometheus](https://prometheus.io/), to enable it use flag `-
 goneypot -enable-prometheus -prom-port 9001 -prom-addr localhost
 ```
 
+### AppArmor
+
+An AppArmor profile can be found in `./extras/apparmor/`.
+
+### Systemd
+
+Goneypot can be started in a systemd service, you can find examples in `./extras/systemd/`.
+
+First create a user and a group `goneypot`, then run:
+
+```bash
+go build -o /usr/bin/goneypot .
+cp ./extras/systemd/goneypot{*.socket,.service} /etc/systemd/system/
+cp ./extras/systemd/goneypotpre.sh /usr/bin/goneypotpre
+systemctl daemon-reload
+systemctl status goneypot.service
+```
+
+> [!NOTE]
+> By default goneypot (via systemd) will listen on port `22`, this can be changed in `/etc/systemd/system/goneypot.socket`.
+
+> [!NOTE]
+> Goneypot configuration can be changed in `/etc/systemd/system/goneypot.service`.
+
 ## Alternatives
 
 - [cowrie](https://github.com/cowrie/cowrie)

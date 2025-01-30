@@ -1,0 +1,9 @@
+[Unit]
+BindsTo=goneypot.service
+Description=goneypot socket listener
+
+[Socket]
+FileDescriptorName=goneypot
+NoDelay=true
+Service=goneypot.service
+ListenStream=0.0.0.0:22

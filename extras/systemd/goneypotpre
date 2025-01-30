@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -euo pipefail
+
+CERT_ROOT=/etc/goneypot
+LOG_ROOT=/var/log/goneypot
+USER=goneypot
+GROUP=goneypot
+
+if [ ! -d "$CERT_ROOT" ]; then
+  mkdir -pv $CERT_ROOT
+fi
+chown $USER:$GROUP -R $CERT_ROOT
+
+if [ ! -d "$LOG_ROOT" ]; then
+  mkdir -pv $LOG_ROOT
+fi
+chown $USER:$GROUP -R $LOG_ROOT
+
+if [ ! -f "$CERT_ROOT/id_rsa" ]; then
+  /bin/ssh-keygen -f $CERT_ROOT/id_rsa -N "" -t rsa -C "root@server"
+fi
+chown $USER:$GROUP $CERT_ROOT/id_rsa
+chmod 400 $CERT_ROOT/id_rsa

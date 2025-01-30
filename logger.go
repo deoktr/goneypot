@@ -21,10 +21,8 @@ var (
 )
 
 func setupLoggers() {
-	// init remote logger
 	setupRemoteLogger()
 
-	// init creds logger
 	if !DisableCredsLog {
 		setupCredsLogger()
 	}

@@ -1,0 +1,18 @@
+include <tunables/global>
+
+profile goneypot /usr/bin/goneypot {
+  include <abstractions/base>
+
+  # goneypot
+  rw /var/log/goneypot/*,
+  r /etc/goneypot/*,
+  r /etc/goneypot/credentials.lst,
+
+  # prometheus
+  r @{sys}/kernel/mm/transparent_hugepage/hpage_pmd_size,
+  r @{PROC}/@{pid}/maps,
+  r @{PROC}/sys/net/core/somaxconn,
+  r @{PROC}/@{pid}/stat,
+  r @{PROC}/@{pid}/limits,
+  r @{PROC}/@{pid}/net/netstat,
+}

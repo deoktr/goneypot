@@ -14,7 +14,7 @@ import (
 	"golang.org/x/term"
 )
 
-const VERSION = "1.9.0"
+const VERSION = "1.9.1"
 
 var (
 	// goneypot configuration
@@ -40,26 +40,20 @@ func loadCredentials(credsFile string) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		sline := strings.SplitN(scanner.Text(), ":", 2)
-
 		if len(sline) != 2 {
 			continue
 		}
-
 		username := sline[0]
 		password := sline[1]
-
 		if _, found := credentials[username]; found {
 			logger.Printf("found duplicate credentials for: %s", username)
 			continue
 		}
-
 		credentials[username] = password
 	}
-
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -74,15 +68,12 @@ func passwordCallback(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error)
 	}
 
 	password, found := credentials[c.User()]
-
 	if !found {
 		return nil, fmt.Errorf("user not found %q", c.User())
 	}
-
 	if password != string(pass) {
 		return nil, fmt.Errorf("wrong password for %q", c.User())
 	}
-
 	return nil, nil
 }
 
@@ -134,7 +125,6 @@ func startHoneypot() {
 			if err != nil {
 				loginFailed.Add(1)
 			}
-
 			return sshPerm, err
 		},
 	}
@@ -151,7 +141,6 @@ func startHoneypot() {
 	if err != nil {
 		logger.Fatal("failed to load private key: ", err)
 	}
-
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
 		logger.Fatal("failed to parse private key: ", err)
@@ -184,9 +173,7 @@ func startHoneypot() {
 			logRemoteEvent(remoteAddr, "connection opened")
 
 			now := time.Now()
-
 			handleCon(config, nConn, remoteAddr)
-
 			requestDurations.Observe(time.Since(now).Seconds())
 
 			openedConnections.Sub(1)
@@ -203,7 +190,6 @@ func handleCon(config *ssh.ServerConfig, nConn net.Conn, remoteAddr string) {
 	}
 
 	logRemoteEvent(remoteAddr, "logged in")
-
 	handleChannels(chans, reqs, remoteAddr)
 }
 
@@ -226,7 +212,6 @@ func handleChannel(newChannel ssh.NewChannel, remoteAddr string) {
 	// may be used to present a simple terminal interface.
 	if t := newChannel.ChannelType(); t != "session" {
 		_ = newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
-
 		logRemoteEvent(remoteAddr, fmt.Sprintf("unknown channel type: %s", t))
 		return
 	}
@@ -236,7 +221,6 @@ func handleChannel(newChannel ssh.NewChannel, remoteAddr string) {
 		logRemoteEvent(remoteAddr, fmt.Sprintf("could not accept channel: %v", err))
 		return
 	}
-
 	defer func() {
 		if channel != nil {
 			channel.Close()

@@ -1,0 +1,9 @@
+[Unit]
+BindsTo=goneypot.service
+Description=goneypot prometheus socket listener
+
+[Socket]
+FileDescriptorName=prometheus
+NoDelay=true
+Service=goneypot.service
+ListenStream=127.0.0.1:9001
