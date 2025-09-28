@@ -4,6 +4,24 @@ Low-interaction SSH honeypot written in Go.
 
 Attackers will be able to log in, and send commands, but nothing is ever executed, just logged.
 
+## Build
+
+Build container image from source:
+
+```bash
+git clone https://github.com/deoktr/goneypot.git
+cd goneypot
+docker build -f Containerfile -t goneypot .
+```
+
+Run:
+
+```bash
+ssh-keygen -f id_rsa -N "" -t rsa
+chmod 666 id_rsa
+docker run -p 2222:2222 -v $(pwd)/id_rsa:/home/nonroot/id_rsa goneypot
+```
+
 ## Usage
 
 Generate SSH server private keys without passphrase:
@@ -15,7 +33,9 @@ ssh-keygen -f id_rsa -N "" -t rsa
 Build:
 
 ```bash
-go build .
+cd src
+go build -o ../goneypot .
+cd ..
 ```
 
 Run:
