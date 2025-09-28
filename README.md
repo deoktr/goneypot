@@ -19,7 +19,6 @@ Run container:
 docker run \
   -p 2222:2222 \
   -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
-  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
   ghcr.io/deoktr/goneypot:latest
 ```
 
