@@ -4,47 +4,26 @@ Low-interaction SSH honeypot written in Go.
 
 Attackers will be able to log in, and send commands, but nothing is ever executed, just logged.
 
-## Build
+## Deploy
 
-Build container image from source:
-
-```bash
-git clone https://github.com/deoktr/goneypot.git
-cd goneypot
-docker build -f Containerfile -t goneypot .
-```
-
-Run:
+Generate SSH keys:
 
 ```bash
 ssh-keygen -f id_rsa -N "" -t rsa
 chmod 666 id_rsa
-docker run -p 2222:2222 -v $(pwd)/id_rsa:/home/nonroot/id_rsa goneypot
 ```
 
-## Usage
-
-Generate SSH server private keys without passphrase:
+Run container:
 
 ```bash
-ssh-keygen -f id_rsa -N "" -t rsa
+docker run \
+  -p 2222:2222 \
+  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
+  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
+  ghcr.io/deoktr/goneypot:latest
 ```
 
-Build:
-
-```bash
-cd src
-go build -o ../goneypot .
-cd ..
-```
-
-Run:
-
-```bash
-./goneypot -key id_rsa -addr 0.0.0.0 -port 2222
-```
-
-Test:
+Connect to the honeypot:
 
 ```bash
 ssh -p 2222 user@localhost
@@ -58,23 +37,33 @@ Login credentials can be added to restrict the username/password that can log in
 
 1. create a file with `username:password` in it:
 
-   ```bash
-   echo "foo:foo" > creds
-   ```
+```bash
+echo "foo:foo" > creds
+```
 
 2. start goneypot with the `-creds-file` flag:
 
-   ```bash
-   goneypot -creds-file creds
-   ```
+```bash
+docker run \
+  -p 2222:2222 \
+  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
+  -v $(pwd)/creds:/home/nonroot/creds \
+  ghcr.io/deoktr/goneypot:latest -creds-file creds
+```
 
 ### Prometheus
 
 goneypot supports [Prometheus](https://prometheus.io/), to enable it use flag `-enable-prometheus`:
 
 ```bash
-goneypot -enable-prometheus -prom-port 9001 -prom-addr localhost
+docker run \
+  -p 2222:2222 \
+  -p 9001:9001 \
+  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
+  ghcr.io/deoktr/goneypot:latest -enable-prometheus -prom-port 9001 -prom-addr 0.0.0.0
 ```
+
+You should create a Docker network and never expose the Prometheus interface, this is just an example.
 
 ### AppArmor
 
