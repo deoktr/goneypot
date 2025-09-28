@@ -14,7 +14,7 @@ import (
 	"golang.org/x/term"
 )
 
-const VERSION = "1.9.1"
+const VERSION = "1.9.2"
 
 var (
 	// goneypot configuration
