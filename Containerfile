@@ -8,8 +8,7 @@ RUN go mod download
 COPY src .
 RUN go build -o /go/bin/goneypot
 
-FROM gcr.io/distroless/base-debian12:nonroot
+FROM gcr.io/distroless/base-debian12
 
-USER nonroot
 COPY --from=build /go/bin/goneypot /usr/bin/goneypot
 ENTRYPOINT [ "/usr/bin/goneypot" ]

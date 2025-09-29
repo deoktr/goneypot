@@ -33,3 +33,5 @@ id_rsa.pub
 
 # log files
 *.log
+
+goneypot_logs/

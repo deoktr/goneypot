@@ -10,7 +10,13 @@ Generate SSH keys:
 
 ```bash
 ssh-keygen -f id_rsa -N "" -t rsa
-chmod 666 id_rsa
+```
+
+Create log directory and files:
+
+```bash
+mkdir goneypot_logs
+touch goneypot_logs/{goneypot.log,credentials.log}
 ```
 
 Run container:
@@ -18,14 +24,22 @@ Run container:
 ```bash
 docker run \
   -p 2222:2222 \
-  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
-  ghcr.io/deoktr/goneypot:latest
+  --userns=keep-id \
+  -v ./goneypot_logs:/var/log/goneypot \
+  -v ./id_rsa:/id_rsa \
+  ghcr.io/deoktr/goneypot:latest -logroot "/var/log/goneypot"
 ```
 
 Connect to the honeypot:
 
 ```bash
 ssh -p 2222 user@localhost
+```
+
+You can then audit the logs in `goneypot_logs/`:
+
+```bash
+cat goneypot_logs/goneypot.log
 ```
 
 ### Credentials
@@ -45,8 +59,9 @@ echo "foo:foo" > creds
 ```bash
 docker run \
   -p 2222:2222 \
-  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
-  -v $(pwd)/creds:/home/nonroot/creds \
+  -v ./goneypot_logs:/var/log/goneypot \
+  -v ./id_rsa:/id_rsa \
+  -v ./creds:/creds \
   ghcr.io/deoktr/goneypot:latest -creds-file creds
 ```
 
@@ -58,7 +73,8 @@ goneypot supports [Prometheus](https://prometheus.io/), to enable it use flag `-
 docker run \
   -p 2222:2222 \
   -p 9001:9001 \
-  -v $(pwd)/id_rsa:/home/nonroot/id_rsa \
+  -v ./goneypot_logs:/var/log/goneypot \
+  -v ./id_rsa:/id_rsa \
   ghcr.io/deoktr/goneypot:latest -enable-prometheus -prom-port 9001 -prom-addr 0.0.0.0
 ```
 
@@ -77,7 +93,7 @@ First create a user and a group `goneypot`, then run:
 ```bash
 go build -o /usr/bin/goneypot .
 cp ./extras/systemd/goneypot{*.socket,.service} /etc/systemd/system/
-cp ./extras/systemd/goneypotpre.sh /usr/bin/goneypotpre
+cp ./extras/systemd/goneypotpre /usr/bin/goneypotpre
 systemctl daemon-reload
 systemctl status goneypot.service
 ```
