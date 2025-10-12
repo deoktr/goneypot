@@ -91,7 +91,17 @@ Goneypot can be started in a systemd service, you can find examples in `./extras
 First create a user and a group `goneypot`, then run:
 
 ```bash
-go build -o /usr/bin/goneypot .
+VERSION=$(git describe --tags)
+REVISION=$(git rev-parse --short HEAD)
+REVISION_TIME=$(git log -1 --format=%cd --date=iso-strict)
+go build -o /usr/bin/goneypot \
+  -buildvcs=false \
+  -trimpath \
+  -ldflags " \
+  -X 'github.com/deoktr/goneypot/main.Version=${VERSION}' \
+  -X 'github.com/deoktr/goneypot/main.Revision=${REVISION}' \
+  -X 'github.com/deoktr/goneypot/main.RevisionTime=${REVISION_TIME}' \
+  "
 cp ./extras/systemd/goneypot{*.socket,.service} /etc/systemd/system/
 cp ./extras/systemd/goneypotpre /usr/bin/goneypotpre
 systemctl daemon-reload
@@ -103,6 +113,31 @@ systemctl status goneypot.service
 
 > [!NOTE]
 > Goneypot configuration can be changed in `/etc/systemd/system/goneypot.service`.
+
+## Development
+
+Build container image locally:
+
+```bash
+VERSION=$(git describe --tags)
+REVISION=$(git rev-parse --short HEAD)
+REVISION_TIME=$(git log -1 --format=%cd --date=iso-strict)
+docker build -f Containerfile \
+  -t "goneypot:${VERSION}" \
+  --build-arg "VERSION=${VERSION}" \
+  --build-arg "REVISION=${REVISION}" \
+  --build-arg "REVISION_TIME=${REVISION_TIME}"
+```
+
+Run:
+
+```bash
+docker run \
+  -p 2222:2222 \
+  -v ./goneypot_logs:/var/log/goneypot \
+  -v ./id_rsa:/id_rsa \
+  "goneypot:${VERSION}" -logroot "/var/log/goneypot"
+```
 
 ## Alternatives
 

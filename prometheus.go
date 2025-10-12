@@ -24,7 +24,7 @@ var (
 			Name: "goneypot_build_info",
 			Help: "Goneypot build infos.",
 		},
-		[]string{"version", "goarch", "goos", "goversion", "tags"},
+		[]string{"version", "revision", "revision_time", "goarch", "goos", "goversion", "tags"},
 	)
 	configInfo = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -100,11 +100,13 @@ func getPrometheusListener() net.Listener {
 
 func startPrometheusListener() {
 	buildInfo.With(prometheus.Labels{
-		"version":   VERSION,
-		"goarch":    runtime.GOARCH,
-		"goos":      runtime.GOOS,
-		"goversion": runtime.Version(),
-		"tags":      "stringlabels",
+		"version":       Version,
+		"revision":      Revision,
+		"revision_time": RevisionTime,
+		"goarch":        runtime.GOARCH,
+		"goos":          runtime.GOOS,
+		"goversion":     runtime.Version(),
+		"tags":          "stringlabels",
 	}).Inc()
 
 	configInfo.With(prometheus.Labels{

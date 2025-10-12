@@ -44,7 +44,7 @@ func init() {
 	})
 
 	flag.BoolFunc("version", "print version", func(s string) error {
-		fmt.Println(VERSION)
+		fmt.Println(Version)
 		os.Exit(0)
 		return nil
 	})
