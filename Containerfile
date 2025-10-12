@@ -14,9 +14,9 @@ RUN go build -o /go/bin/goneypot \
 	-buildvcs=false \
 	-trimpath \
 	-ldflags " \
-	-X 'github.com/deoktr/goneypot/main.Version=${VERSION}' \
-	-X 'github.com/deoktr/goneypot/main.Revision=${REVISION}' \
-	-X 'github.com/deoktr/goneypot/main.RevisionTime=${REVISION_TIME}' \
+	-X 'main.Version=${VERSION}' \
+	-X 'main.Revision=${REVISION}' \
+	-X 'main.RevisionTime=${REVISION_TIME}' \
 	"
 
 FROM gcr.io/distroless/base-debian12

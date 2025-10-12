@@ -15,12 +15,6 @@ import (
 )
 
 var (
-	Version      string
-	Revision     string
-	RevisionTime string
-)
-
-var (
 	// goneypot configuration
 	Addr           = "0.0.0.0"
 	Port           = 2222

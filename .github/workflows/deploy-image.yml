@@ -50,6 +50,9 @@ jobs:
       - name: Get Git commit timestamps
         run: echo "TIMESTAMP=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
 
+      - name: Get Git tag
+        run: echo "GIT_TAG=$(git describe --tags)" >> $GITHUB_ENV
+
       - name: Get Git short commit hash
         run: echo "SHORT_COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
@@ -65,10 +68,10 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args:
-            - VERSION=${{ env.GIT_TAG }}
-            - REVISION=${{ env.SHORT_COMMIT_HASH }}
-            - REVISION_TIME=${{ env.ISO_TIMESTAMP }}
+          build-args: |
+            VERSION=${{ env.GIT_TAG }}
+            REVISION=${{ env.SHORT_COMMIT_HASH }}
+            REVISION_TIME=${{ env.ISO_TIMESTAMP }}
         env:
           # enables reproducible builds
           SOURCE_DATE_EPOCH: ${{ env.TIMESTAMP }}
