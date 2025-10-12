@@ -66,9 +66,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args:
-            VERSION: ${{ env.GIT_TAG }}
-            REVISION: ${{ env.SHORT_COMMIT_HASH }}
-            REVISION_TIME: ${{ env.ISO_TIMESTAMP }}
+            - VERSION=${{ env.GIT_TAG }}
+            - REVISION=${{ env.SHORT_COMMIT_HASH }}
+            - REVISION_TIME=${{ env.ISO_TIMESTAMP }}
         env:
           # enables reproducible builds
           SOURCE_DATE_EPOCH: ${{ env.TIMESTAMP }}
