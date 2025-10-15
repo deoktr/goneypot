@@ -122,8 +122,10 @@ Build container image locally:
 VERSION=$(git describe --tags)
 REVISION=$(git rev-parse --short HEAD)
 REVISION_TIME=$(git log -1 --format=%cd --date=iso-strict)
+SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
 docker build . -f Containerfile \
   -t "goneypot:${VERSION}" \
+  --timestamp ${SOURCE_DATE_EPOCH} \
   --build-arg "VERSION=${VERSION}" \
   --build-arg "REVISION=${REVISION}" \
   --build-arg "REVISION_TIME=${REVISION_TIME}"
