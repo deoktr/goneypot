@@ -51,7 +51,7 @@ jobs:
         run: echo "TIMESTAMP=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
 
       - name: Get Git tag
-        run: echo "GIT_TAG=$(git describe --tags)" >> $GITHUB_ENV
+        run: echo "VERSION=$(git describe --tags | sed 's/^v//')" >> $GITHUB_ENV
 
       - name: Get Git short commit hash
         run: echo "SHORT_COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
@@ -69,7 +69,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ env.GIT_TAG }}
+            VERSION=${{ env.VERSION }}
             REVISION=${{ env.SHORT_COMMIT_HASH }}
             REVISION_TIME=${{ env.ISO_TIMESTAMP }}
         env:
