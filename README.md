@@ -25,9 +25,9 @@ Run container:
 docker run \
   -p 2222:2222 \
   --userns=keep-id \
-  -v ./goneypot_logs:/var/log/goneypot \
-  -v ./id_rsa:/id_rsa \
-  ghcr.io/deoktr/goneypot:latest -logroot "/var/log/goneypot"
+  -v ./goneypot_logs:/var/log/goneypot:rw,U \
+  -v ./id_rsa:/id_rsa:ro,U \
+  ghcr.io/deoktr/goneypot:latest -key /id_rsa -logroot "/var/log/goneypot"
 ```
 
 Connect to the honeypot:
@@ -59,10 +59,10 @@ echo "foo:foo" > creds
 ```bash
 docker run \
   -p 2222:2222 \
-  -v ./goneypot_logs:/var/log/goneypot \
-  -v ./id_rsa:/id_rsa \
-  -v ./creds:/creds \
-  ghcr.io/deoktr/goneypot:latest -creds-file creds
+  -v ./goneypot_logs:/var/log/goneypot:rw,U \
+  -v ./id_rsa:/id_rsa:ro,U \
+  -v ./creds:/creds:rw,U \
+  ghcr.io/deoktr/goneypot:latest -key /id_rsa -creds-file /creds
 ```
 
 ### Prometheus
@@ -73,9 +73,10 @@ goneypot supports [Prometheus](https://prometheus.io/), to enable it use flag `-
 docker run \
   -p 2222:2222 \
   -p 9001:9001 \
-  -v ./goneypot_logs:/var/log/goneypot \
-  -v ./id_rsa:/id_rsa \
-  ghcr.io/deoktr/goneypot:latest -enable-prometheus -prom-port 9001 -prom-addr 0.0.0.0
+  -v ./goneypot_logs:/var/log/goneypot:rw,U \
+  -v ./id_rsa:/id_rsa:ro,U \
+  ghcr.io/deoktr/goneypot:latest \
+    -enable-prometheus -key /id_rsa -prom-port 9001 -prom-addr 0.0.0.0
 ```
 
 You should create a Docker network and never expose the Prometheus interface, this is just an example.
@@ -98,9 +99,9 @@ go build -o /usr/bin/goneypot \
   -buildvcs=false \
   -trimpath \
   -ldflags " \
-  -X 'github.com/deoktr/goneypot/main.Version=${VERSION}' \
-  -X 'github.com/deoktr/goneypot/main.Revision=${REVISION}' \
-  -X 'github.com/deoktr/goneypot/main.RevisionTime=${REVISION_TIME}' \
+    -X 'github.com/deoktr/goneypot/main.Version=${VERSION}' \
+    -X 'github.com/deoktr/goneypot/main.Revision=${REVISION}' \
+    -X 'github.com/deoktr/goneypot/main.RevisionTime=${REVISION_TIME}' \
   "
 cp ./extras/systemd/goneypot{*.socket,.service} /etc/systemd/system/
 cp ./extras/systemd/goneypotpre /usr/bin/goneypotpre
@@ -134,11 +135,14 @@ docker build . -f Containerfile \
 Run:
 
 ```bash
+ssh-keygen -f id_rsa -N "" -t rsa
+mkdir goneypot_logs
+VERSION=$(git describe --tags)
 docker run \
   -p 2222:2222 \
-  -v ./goneypot_logs:/var/log/goneypot \
-  -v ./id_rsa:/id_rsa \
-  "goneypot:${VERSION}" -logroot "/var/log/goneypot"
+  -v ./goneypot_logs:/var/log/goneypot:rw,U \
+  -v ./id_rsa:/id_rsa:ro,U \
+  "goneypot:${VERSION}" -logroot "/var/log/goneypot" -key "/id_rsa"
 ```
 
 ## Alternatives
