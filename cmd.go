@@ -9,6 +9,8 @@ import (
 func ExecuteCLI() {
 	flag.Parse()
 
+	fmt.Printf("starting goneypot %s\n", Version)
+
 	setupLoggers()
 
 	startHoneypot()

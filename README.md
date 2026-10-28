@@ -44,7 +44,7 @@ cat goneypot_logs/goneypot.log
 
 ### Credentials
 
-By default, goneypot accept any combinaison of username/password.
+By default, goneypot accept any combinations of username/password.
 
 Login credentials can be added to restrict the username/password that can log in:
 
